@@ -1,0 +1,7 @@
+<!--
+[파일 기능명세] React 단일 페이지의 HTML 진입점.
+입력: Vite가 해석하는 /src/main.tsx 모듈. 출력: #root에 AccessGate와 앱 UI 마운트.
+문서 계약: 한국어 lang, UTF-8, 반응형 viewport, 앱 제목과 테마색을 지정한다.
+부수효과: 모듈 스크립트를 로드한다. 데이터·비밀번호 검증은 이 HTML이 아니라 API와 React에서 처리한다.
+-->
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta name="theme-color" content="#172b25"/><title>새봄 문서비교</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
