@@ -1,62 +1,95 @@
 # [파일 기능명세]
 # HTTP 경계. 요청 모델 검증, 로컬 실행 세션·비밀번호 잠금 검사, 작업 접수와 PDF·CSV 응답을 제공한다. 업무 로직은 Service, 저장·이동은 Store에 위임한다.
+# 비밀번호는 config.APP_PASSWORD와 비교하고, 연속 실패가 config.LOGIN_MAX_FAILURES회에 이르면 config.LOGIN_LOCK_SECONDS초 동안 429로 거절한다(메모리 관리, 재시작 시 초기화).
+# 예외 변환: BusinessError는 400(로그 없음), 일반 ValueError는 400+로그, 응답은 {"detail": 메시지}.
+# 결과 API는 목록용 요약(GET /api/results)과 pages를 비운 상세(GET /api/results/{id})로 나뉜다.
+# 계약서 목록 API는 가져오기 작업 접수(POST /api/contracts/import)와 가져온 계약 조회(GET /api/contracts, pages 비움)이며 둘 다 잠금 해제가 필요하다.
+# 거래명세서 API는 초안 조회(GET /api/contracts/{id}/statement), 생성(POST 같은 경로), 엑셀 내려받기(GET /api/statements/{file})이며
+# 없는 계약은 404, 원문 없음·지출 계약 생성·검증 실패·작업 중은 400이다. 생성 규칙은 statement.py에 있다.
+# 로컬 세금계산서 대조 API는 상태 조회(GET /api/local-audit), 폴더 저장(PUT /api/local-audit/folder), 폴더 선택창(POST /api/local-audit/pick-folder),
+# 대조 작업 접수(POST /api/local-audit/run)이며 모두 잠금 해제가 필요하다. 폴더 선택창은 ask_folder 도우미를 원본 PDF 폴더 선택과 함께 쓴다.
+# 지출결의서 초안·상신은 routes/contracts.py가 Service에 위임하며, 상신 뒤 불확실 오류는 contract_status.data.site_draft로 남긴다.
 # 유지보수: 함수·데이터 계약이 바뀌면 해당 기능명세와 실제 회귀 검사를 함께 갱신한다.
 
-import csv
-import io
+import logging
+import math
 import secrets
+import threading
+import time
 from contextlib import asynccontextmanager
-from datetime import date
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
 
+from .api_models import Login
+from . import config
+from .errors import BusinessError
+from .views import strip_result_pages
 from .service import Service
 from .store import Store
 
-
-# [자료형/클래스 명세] Pair: 비교 연결 입력. 메일 ID·계약 ID·계산서 URL을 문자열로 받는다.
-class Pair(BaseModel):
-    mail_id: str
-    contract_id: str
-    invoice_url: str
+log = logging.getLogger(__name__)
 
 
-# [자료형/클래스 명세] Work: 주요 작업 입력. Pair 목록을 1~500건으로 제한한다.
-class Work(BaseModel):
-    pairs: list[Pair] = Field(min_length=1, max_length=500)
+# [기능명세] strip_pages
+# 목적: 결과 상세 응답에서 큰 페이지 전문(pages)을 뺀 사본 생성
+# 입력: (result: Store.result가 반환한 결과 사전)
+# 출력: rows의 invoice·contract의 extraction.pages와 effective_invoice.pages를 빈 배열로 바꾼 새 결과 사전
+# 처리: views.strip_result_pages에 위임(동작 동일; 입력 사전과 저장 데이터는 변경하지 않음)
+# 예외/실패: rows가 없으면 빈 목록으로 처리
+# 부수효과: 없음
+def strip_pages(result):
+    return strip_result_pages(result)
 
 
-# [자료형/클래스 명세] Correct: 수동 보정 입력. 문서 ID별 필드 변경 사전을 받으며 세부 허용값은 엔드포인트에서 검증한다.
-class Correct(BaseModel):
-    overrides: dict[str, dict[str, Any]]
+# [기능명세] _same
+# 목적: 비밀 문자열(토큰·쿠키)을 상수시간으로 비교하되 비ASCII 입력에도 예외가 나지 않게 함
+# 입력: (a: str, b: str)
+# 출력: 두 문자열이 UTF-8 바이트로 같으면 True
+# 처리: 양쪽을 UTF-8로 인코딩해 secrets.compare_digest(bytes, bytes) 호출
+# 예외/실패: 없음(str 입력 가정; 쿠키·쿼리 값은 항상 str). str끼리 비교하면 비ASCII에서 TypeError가 나는 문제를 막는다
+# 부수효과: 없음
+def _same(a, b):
+    return secrets.compare_digest(a.encode("utf-8"), b.encode("utf-8"))
 
 
-# [자료형/클래스 명세] Settings: 설정 입력. PDF 루트 경로 문자열 길이는 1~1000자이며 경로 유효성은 Store에서 검사한다.
-class Settings(BaseModel):
-    document_root: str = Field(min_length=1, max_length=1000)
-
-
-# [자료형/클래스 명세] Login: 로그인 입력. 비밀번호 문자열 길이는 1~128자이며 정답 비교는 login에서 수행한다.
-class Login(BaseModel):
-    password: str = Field(min_length=1, max_length=128)
+# [기능명세] ask_folder
+# 목적: Windows 기본 폴더 선택창을 열고 고른 폴더 반환(원본 PDF 저장 위치·세금계산서 폴더 선택 공용)
+# 입력: (title: 대화상자 제목, initialdir: 시작 폴더 문자열)
+# 출력: 고른 폴더 문자열 또는 None(취소)
+# 처리: 숨긴 Tk 창 생성→최상단 표시→filedialog.askdirectory(title, initialdir)→finally에서 창 파괴
+# 예외/실패: Tk·대화상자 오류 전파. 주의: 동기 라우트로 호출되면 FastAPI 스레드풀(비메인 스레드)에서 실행된다.
+#           Tk는 메인 스레드 사용이 원칙이라 환경에 따라 불안정(교착·창 미표시·TclError)할 수 있고, 동시에 두 번 열면 서로 막을 수 있다. 동작은 바꾸지 않았다(알려진 위험).
+#           테스트는 모듈 속성 api.ask_folder를 바꿔 대화상자 없이 검사한다
+# 부수효과: 네이티브 대화상자 표시; 설정을 저장하지 않음
+def ask_folder(title, initialdir):
+    import tkinter as tk
+    from tkinter import filedialog
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        return filedialog.askdirectory(title=title, initialdir=initialdir, parent=root) or None
+    finally:
+        root.destroy()
 
 
 # [기능명세] create_app
 # 목적: 로컬 HTTP 앱과 경로·접근 정책 구성
 # 입력: (store: Store, static: Path, token=None, shutdown=None, activate=None)
 # 출력: FastAPI 인스턴스
-# 처리: Service·실행 세션·잠금 토큰 생성→미들웨어·엔드포인트·정적 파일 등록
+# 처리: Service·실행 세션·잠금 토큰·로그인 실패 상태(횟수·잠금 만료 시각, threading.Lock 보호) 생성→미들웨어·엔드포인트·정적 파일 등록
 # 예외/실패: Store·정적 파일 준비 오류 전파
 # 부수효과: Service 작업 실행기 생성; 서버 포트 바인딩은 launcher 담당
 def create_app(store: Store, static: Path, token=None, shutdown=None, activate=None):
     service = Service(store)
     token = token or secrets.token_urlsafe(32)
     unlocked_token = secrets.token_urlsafe(32)
+    # 로그인 실패 상태: 이 앱 인스턴스(실행)에서만 유지한다. 시각은 time.monotonic() 기준.
+    login_lock = threading.Lock()
+    login_state = {"failures": 0, "locked_until": 0.0}
 
     # [기능명세] create_app.lifespan
     # 목적: HTTP 앱 종료 자원 정리
@@ -72,15 +105,14 @@ def create_app(store: Store, static: Path, token=None, shutdown=None, activate=N
         store.close()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    app.state.service = service
-    app.state.token = token
+    app.state.service = service  # 테스트가 작업 상태를 직접 확인할 때 쓴다(실행 토큰은 클로저 변수 token만 사용)
 
     # [기능명세] create_app.protect
     # 목적: 로컬 실행 세션과 비밀번호 잠금 검사
     # 입력: (request: Request, call_next)
     # 출력: HTTP 응답 또는 다음 핸들러 응답
     # 처리: Host/Origin→health→최초 토큰 쿠키→실행 쿠키→보호 API 잠금→보안 헤더
-    # 예외/실패: 호스트·출처 403, 실행·잠금 미인증 401; 허용 경로 외 API 접근 차단
+    # 예외/실패: 호스트·출처 403, 실행·잠금 미인증 401(비ASCII 토큰·쿠키도 500이 아닌 401); 허용 경로 외 API 접근 차단
     # 부수효과: 실행 세션 쿠키와 응답 헤더 설정; 서버 파일 내용 변경 없음
     @app.middleware("http")
     async def protect(request: Request, call_next):
@@ -92,16 +124,16 @@ def create_app(store: Store, static: Path, token=None, shutdown=None, activate=N
             return JSONResponse({"detail": "다른 사이트의 요청은 허용되지 않습니다."}, status_code=403)
         if request.url.path == "/health":
             return JSONResponse({"ok": True, "app": "SaebomCompare"})
-        if request.url.path == "/" and secrets.compare_digest(request.query_params.get("token", ""), token):
+        if request.url.path == "/" and _same(request.query_params.get("token", ""), token):
             response = RedirectResponse("/", status_code=303)
             response.set_cookie("saebom_session", token, httponly=True, samesite="strict")
             response.headers["Referrer-Policy"] = "no-referrer"
             return response
-        if not secrets.compare_digest(request.cookies.get("saebom_session", ""), token):
+        if not _same(request.cookies.get("saebom_session", ""), token):
             return JSONResponse({"detail": "EXE를 실행해 앱 화면을 다시 열어 주세요."}, status_code=401)
         public_api = {"/api/auth/status", "/api/auth/login", "/api/activate"}
         if request.url.path.startswith("/api/") and request.url.path not in public_api:
-            if not secrets.compare_digest(request.cookies.get("saebom_unlocked", ""), unlocked_token):
+            if not _same(request.cookies.get("saebom_unlocked", ""), unlocked_token):
                 return JSONResponse({"detail": "비밀번호를 입력해 프로그램을 잠금 해제해 주세요."}, status_code=401)
         response = await call_next(request)
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -112,255 +144,59 @@ def create_app(store: Store, static: Path, token=None, shutdown=None, activate=N
         return response
 
     # [기능명세] create_app.bad_input
-    # 목적: 업무 ValueError를 화면용 응답으로 변환
+    # 목적: ValueError를 화면용 응답으로 변환하되 내부 버그가 400 뒤에 숨지 않게 기록
     # 입력: (request, exc)
-    # 출력: detail을 담은 HTTP 400 JSON
-    # 처리: 예외 메시지를 문자열로 전달
-    # 예외/실패: 다른 예외 종류는 이 핸들러의 대상이 아님
-    # 부수효과: 없음
+    # 출력: {"detail": 메시지} 형태의 HTTP 400 JSON(형식·상태코드는 기존과 동일)
+    # 처리: errors.BusinessError(사용자가 고칠 수 있는 업무 오류)는 로그 없이 변환. 그 밖의 ValueError는 호환을 위해 400을 유지하되 log.exception으로 기록
+    # 예외/실패: ValueError 외 예외 종류는 이 핸들러의 대상이 아님
+    # 부수효과: 일반 ValueError일 때만 logging.exception 기록
     @app.exception_handler(ValueError)
     async def bad_input(request, exc):
+        if not isinstance(exc, BusinessError):
+            log.exception("요청 처리 중 ValueError(업무 오류가 아닌 일반 ValueError): %s %s", request.method, request.url.path, exc_info=exc)
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
     # [기능명세] create_app.auth_status
     # 목적: 현재 실행의 비밀번호 인증 여부 조회
     # 입력: (request: Request)
     # 출력: authenticated 불리언 사전
-    # 처리: 요청 잠금 해제 쿠키와 실행별 토큰을 상수시간 비교
+    # 처리: 요청 잠금 해제 쿠키와 실행별 토큰을 UTF-8 바이트로 상수시간 비교(_same; 비ASCII 쿠키도 False)
     # 예외/실패: 실행 쿠키 검사는 미들웨어 담당
     # 부수효과: 쿠키 읽기; 비밀번호를 반환하지 않음
     @app.get("/api/auth/status")
     def auth_status(request: Request):
-        return {"authenticated": secrets.compare_digest(request.cookies.get("saebom_unlocked", ""), unlocked_token)}
+        return {"authenticated": _same(request.cookies.get("saebom_unlocked", ""), unlocked_token)}
 
     # [기능명세] create_app.login
     # 목적: 시작 비밀번호 검증과 잠금 해제
     # 입력: (body: Login)
     # 출력: 성공 JSON 응답 및 HttpOnly 쿠키
-    # 처리: UTF-8 비밀번호와 설정된 고정 값을 compare_digest로 비교
-    # 예외/실패: 틀린 비밀번호는 HTTP 401; 길이 검증은 Login 모델 담당
-    # 부수효과: 성공 시 실행별 잠금 해제 쿠키 발급; 파일·DB에 입력값을 저장하지 않음
+    # 처리: login_lock 안에서 잠금 만료 시각 확인→UTF-8 비밀번호와 config.APP_PASSWORD를 compare_digest로 비교→실패면 횟수 증가, config.LOGIN_MAX_FAILURES회에 이르면 횟수를 0으로 되돌리고 config.LOGIN_LOCK_SECONDS초 잠금→성공이면 횟수 초기화
+    # 예외/실패: 잠금 중이면 정답이어도 HTTP 429("비밀번호를 여러 번 틀렸습니다. N초 후 다시 시도해 주세요.", N은 남은 초 올림); 틀린 비밀번호는 HTTP 401(잠금을 거는 마지막 실패도 401); 길이 검증은 Login 모델 담당
+    # 부수효과: 메모리의 실패 횟수·잠금 시각 갱신; 성공 시 실행별 잠금 해제 쿠키 발급; 파일·DB에 입력값을 저장하지 않음
     @app.post("/api/auth/login")
     def login(body: Login):
-        if not secrets.compare_digest(body.password.encode("utf-8"), b"0000"):
-            raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
+        with login_lock:
+            remaining = login_state["locked_until"] - time.monotonic()
+            if remaining > 0:
+                raise HTTPException(status_code=429, detail=f"비밀번호를 여러 번 틀렸습니다. {max(1, math.ceil(remaining))}초 후 다시 시도해 주세요.")
+            if not secrets.compare_digest(body.password.encode("utf-8"), config.APP_PASSWORD.encode("utf-8")):
+                login_state["failures"] += 1
+                if login_state["failures"] >= config.LOGIN_MAX_FAILURES:
+                    login_state["failures"] = 0
+                    login_state["locked_until"] = time.monotonic() + config.LOGIN_LOCK_SECONDS
+                raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
+            login_state["failures"] = 0
         response = JSONResponse({"authenticated": True})
         response.set_cookie("saebom_unlocked", unlocked_token, httponly=True, samesite="strict")
         return response
 
-    # [기능명세] create_app.state
-    # 목적: 화면 초기·주기 조회용 상태 반환
-    # 입력: ()
-    # 출력: 목록/작업/저장 경로/사이트 사전
-    # 처리: 작업 잠금 조회와 Service.catalog 결과 합치기
-    # 예외/실패: 잠금·실행 인증 선행; 저장 조회 오류 전파
-    # 부수효과: DB·파일 존재 여부 읽기
-    @app.get("/api/state")
-    def state():
-        with service.lock:
-            jobs = list(service.jobs.values())[::-1]
-        return {**service.catalog(), "jobs": jobs, "data_dir": str(store.root), "document_root": str(store.document_root()), "site": "https://sbgw.vercel.app/"}
-
-    # [기능명세] create_app.settings
-    # 목적: 저장 위치 변경 요청 처리
-    # 입력: (body: Settings)
-    # 출력: document_root 사전
-    # 처리: 서비스 잠금→실행 작업 검사→Store.set_document_root
-    # 예외/실패: 진행 작업은 ValueError; OSError를 안내 가능한 ValueError로 변환
-    # 부수효과: 등록 PDF 이동과 DB 설정·경로 변경; 세부 원자성은 Store 명세 참조
-    @app.put("/api/settings")
-    def settings(body: Settings):
-        with service.lock:
-            if any(j["status"] == "running" for j in service.jobs.values()):
-                raise ValueError("진행 중인 작업이 끝난 뒤 저장 위치를 변경해 주세요.")
-            try:
-                return {"document_root": store.set_document_root(body.document_root)}
-            except OSError as e:
-                raise ValueError(f"저장 위치를 바꾸지 못했습니다. 기존 설정과 원본 파일은 유지됩니다. 새 폴더의 쓰기 권한과 여유 공간을 확인해 주세요. ({type(e).__name__})")
-
-    # [기능명세] create_app.pick_folder
-    # 목적: Windows 기본 폴더 선택창 제공
-    # 입력: ()
-    # 출력: folder 문자열 또는 None 사전
-    # 처리: 숨긴 Tk 창 생성→최상단 폴더 대화상자→finally에서 창 파괴
-    # 예외/실패: 취소는 None; Tk·대화상자 오류 전파
-    # 부수효과: 네이티브 대화상자 표시; 선택만으로 설정을 적용하지 않음
-    @app.post("/api/settings/pick-folder")
-    def pick_folder():
-        import tkinter as tk
-        from tkinter import filedialog
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes("-topmost", True)
-        try:
-            folder = filedialog.askdirectory(title="원본 PDF 저장 폴더 선택", initialdir=str(store.document_root().parent), parent=root)
-            return {"folder": folder or None}
-        finally:
-            root.destroy()
-
-    # [기능명세] create_app.sync
-    # 목적: 목록 동기화 작업 접수
-    # 입력: ()
-    # 출력: 작업 ID 사전
-    # 처리: Service.submit으로 sync 예약
-    # 예외/실패: 진행 중·종료 중이면 ValueError
-    # 부수효과: 백그라운드 사이트 수집 예약
-    @app.post("/api/sync")
-    def sync():
-        return service.submit("목록 동기화", service.sync)
-
-    # [기능명세] create_app.browser
-    # 목적: 로그인용 사이트 브라우저 열기 작업 접수
-    # 입력: ()
-    # 출력: 작업 ID 사전
-    # 처리: Service.submit으로 open_browser 예약
-    # 예외/실패: 진행 중·종료 중이면 ValueError
-    # 부수효과: 사이트 브라우저 탐색 예약
-    @app.post("/api/browser")
-    def browser():
-        return service.submit("전용 브라우저", service.open_browser)
-
-    # [기능명세] create_app.download
-    # 목적: 선택 PDF 저장 작업 접수
-    # 입력: (work: Work)
-    # 출력: 작업 ID 사전
-    # 처리: 요청 모델→연결 검증→download 예약
-    # 예외/실패: 잘못된 연결은 ValueError, 형식 오류는 모델 검증 응답
-    # 부수효과: 다운로드 예약; 완료 결과는 상태 API에서 확인
-    @app.post("/api/download")
-    def download(work: Work):
-        pairs = [p.model_dump() for p in work.pairs]
-        service.validate_pairs(pairs)
-        return service.submit("문서 다운로드", service.download, pairs)
-
-    # [기능명세] create_app.compare
-    # 목적: 오프라인 비교 작업 접수
-    # 입력: (work: Work)
-    # 출력: 작업 ID 사전
-    # 처리: 요청 모델→연결 검증→run_compare 예약
-    # 예외/실패: 모델 오류·잘못된 연결·작업 충돌 시 실패
-    # 부수효과: 로컬 비교 작업 예약
-    @app.post("/api/compare")
-    def compare(work: Work):
-        pairs = [p.model_dump() for p in work.pairs]
-        service.validate_pairs(pairs)
-        return service.submit("오프라인 비교", service.run_compare, pairs)
-
-    # [기능명세] create_app.results
-    # 목적: 저장 이력 조회
-    # 입력: ()
-    # 출력: 결과 사전 목록
-    # 처리: Store.results 호출
-    # 예외/실패: 실행·잠금 인증 선행
-    # 부수효과: DB 읽기
-    @app.get("/api/results")
-    def results():
-        return store.results()
-
-    # [기능명세] create_app.correct
-    # 목적: 추출값 수동 보정 재비교 접수
-    # 입력: (id: str, body: Correct)
-    # 출력: 새 작업 ID 사전
-    # 처리: 기존 결과 검색→문서·필드·범위·월 검사→보정 병합→부모 결과를 참조해 재비교
-    # 예외/실패: 결과 부재 404, 허용하지 않은 보정 ValueError
-    # 부수효과: 새 결과 생성 작업 예약; 원본 PDF·이전 결과는 변경하지 않음
-    @app.post("/api/results/{id}/correct")
-    def correct(id: str, body: Correct):
-        result = next((r for r in store.results() if r["id"] == id), None)
-        if not result:
-            raise HTTPException(404, "결과를 찾을 수 없습니다.")
-        valid_ids = {r["invoice"]["id"] for r in result["rows"]}
-        fields = {"supply", "vat", "total", "month", "biz", "percent", "installment", "partner"}
-        for docid, changes in body.overrides.items():
-            if docid not in valid_ids or not changes.keys() <= fields:
-                raise ValueError("수정할 문서 또는 항목이 잘못되었습니다.")
-            for key, v in changes.items():
-                if key in {"supply", "vat", "total", "percent", "installment"}:
-                    if type(v) is not int or v < 0 or v > (100 if key == "percent" else 10**12):
-                        raise ValueError("금액·차수·비율은 범위 안의 정수로 입력해 주세요.")
-                elif not isinstance(v, str) or len(v) > 200:
-                    raise ValueError("수정값을 200자 이내 문자열로 입력해 주세요.")
-                elif key == "month":
-                    try:
-                        date.fromisoformat(v + "-01")
-                    except ValueError:
-                        raise ValueError("청구 월은 YYYY-MM 형식으로 입력해 주세요.")
-        merged = {k: dict(v) for k, v in result.get("overrides", {}).items()}
-        for k, v in body.overrides.items():
-            merged.setdefault(k, {}).update(v)
-        return service.submit("보정 후 재비교", service.run_compare, result["pairs"], merged, id)
-
-    # [기능명세] create_app.document
-    # 목적: 현재 경로의 원본 PDF 제공
-    # 입력: (id: str)
-    # 출력: inline application/pdf FileResponse
-    # 처리: 문서 ID 조회→최신 경로 존재 확인→파일 응답
-    # 예외/실패: 레코드 또는 파일 부재 HTTP 404
-    # 부수효과: PDF 파일 읽기; 임의 사용자 경로를 입력받지 않음
-    @app.get("/api/documents/{id}")
-    def document(id: str):
-        doc = store.document(id=id)
-        if not doc or not store.path(doc).exists():
-            raise HTTPException(404, "저장한 PDF를 찾을 수 없습니다. 다시 다운로드해 주세요.")
-        return FileResponse(store.path(doc), media_type="application/pdf", filename=doc["name"], content_disposition_type="inline")
-
-    # [기능명세] create_app.csv_result
-    # 목적: 비교 결과를 CSV로 변환
-    # 입력: (id: str)
-    # 출력: UTF-8 BOM이 포함된 다운로드 Response
-    # 처리: 결과 조회→항목별 행과 근거 작성→셀 수식 접두어 방어
-    # 예외/실패: 결과 부재 HTTP 404
-    # 부수효과: 메모리 CSV 생성; 서버 파일로 저장하지 않음
-    @app.get("/api/results/{id}/csv")
-    def csv_result(id: str):
-        result = next((r for r in store.results() if r["id"] == id), None)
-        if not result:
-            raise HTTPException(404, "결과가 없습니다.")
-        out = io.StringIO()
-        writer = csv.writer(out)
-
-        # [기능명세] create_app.csv_result.safe
-        # 목적: CSV 셀 수식 해석 방지 문자열 변환
-        # 입력: (v)
-        # 출력: 안전한 셀 문자열
-        # 처리: None을 빈 값으로, 그 외 문자열화 후 위험 접두 문자 앞에 작은따옴표 추가
-        # 예외/실패: 의도된 문자열 변환이 전제
-        # 부수효과: 없음
-        def safe(v):
-            s = "" if v is None else str(v)
-            return "'" + s if s.startswith(("=", "+", "-", "@", "\t", "\r")) else s
-
-        writer.writerow(["업체", "메일", "계약번호", "전체판정", "항목", "계산서", "계약·기준", "차이(계산서-기준)", "항목판정", "설명", "계산서 근거", "계약 근거"])
-        for row in result["rows"]:
-            for c in row["checks"] or [{"label": "문서 처리", "status": row["status"], "note": row["error"]}]:
-                writer.writerow([safe(x) for x in (row["partner"], row["subject"], row["contract_id"], row["status"], c["label"], c.get("actual"), c.get("expected"), c.get("difference"), c["status"], c.get("note"), (c.get("invoice_source") or {}).get("quote"), (c.get("contract_source") or {}).get("quote"))])
-        return Response("\ufeff" + out.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="saebom-{id[:8]}.csv"'})
-
-    # [기능명세] create_app.stop
-    # 목적: 로컬 프로그램 정상 종료 요청
-    # 입력: ()
-    # 출력: ok 불리언 사전
-    # 처리: shutdown 콜백이 있으면 호출
-    # 예외/실패: 실행·잠금 인증 선행; 콜백 오류 전파
-    # 부수효과: 서버 종료 플래그 변경 요청
-    @app.post("/api/shutdown")
-    def stop():
-        if shutdown:
-            shutdown()
-        return {"ok": True}
-
-    # [기능명세] create_app.focus_window
-    # 목적: 기존 앱 창 활성화 요청
-    # 입력: ()
-    # 출력: ok 불리언 사전
-    # 처리: activate 콜백이 있으면 호출
-    # 예외/실패: 실행 세션은 필요하지만 잠금 해제 전에도 허용
-    # 부수효과: 앱 활성화 이벤트 설정; 비밀번호 잠금을 해제하지 않음
-    @app.post("/api/activate")
-    def focus_window():
-        if activate:
-            activate()
-        return {"ok": True}
+    from .routes import compare, contracts, devdocs, local_audit, system
+    # [기능명세] folder_picker 콜백: 제목과 초기 경로를 현재 api.ask_folder에 전달한다.
+    # 출력은 선택 폴더 또는 None. 예외와 대화상자 표시는 ask_folder 명세를 따른다.
+    folder_picker = lambda title, initialdir: ask_folder(title, initialdir)
+    for routes in (compare, contracts, devdocs, local_audit, system):
+        routes.register(app, service, store, ask_folder=folder_picker, strip_pages=strip_pages, shutdown=shutdown, activate=activate)
 
     app.mount("/", StaticFiles(directory=static, html=True), name="ui")
     return app

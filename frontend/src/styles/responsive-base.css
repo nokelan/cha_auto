@@ -1,0 +1,71 @@
+/* [표시 기능명세] 회전 애니메이션 명세: spin 클래스가 1.2초 선형 무한 회전에 사용하며 상태 변경·API 호출은 하지 않는다. */
+@keyframes rotate{
+to{transform:rotate(360deg)}
+}
+@media(min-width:1600px){
+.content{padding-top:45px}
+td{padding-top:21px;padding-bottom:21px}
+}
+@media(max-width:1100px){
+.content{padding:25px 22px 0}
+.topbar{padding:0 22px}
+.review-layout{grid-template-columns:200px 1fr}
+.result-summary{gap:var(--space-medium)}
+.result-counts{gap:10px}
+.result-summary .eyebrow{display:none}
+.result-summary h2{font-size:17px}
+.action-bar{align-items:flex-start;flex-direction:column;gap:17px}
+.connection{grid-template-columns:1fr 18px 1.2fr;gap:10px}
+td,th{padding-left:13px;padding-right:13px}
+.result-summary{flex-wrap:wrap}
+}
+@media(max-width:760px){
+.sidebar{position:static;width:70px;padding:22px 8px}
+.brand{margin:0 auto 30px}
+.brand div,.workspace-label,.sidebar nav button>span,.sidebar-bottom{display:none}
+.sidebar nav button{font-size:0;padding:14px 0;justify-content:center;gap:0}
+.brand-icon{width:42px}
+.sidebar nav{gap:var(--space-medium)}
+main{margin:0;width:calc(100% - 70px)}
+.topbar>div{display:none}
+.content{padding:24px 15px 0}
+.heading-line{align-items:flex-start;flex-direction:column}
+h1{font-size:22px}
+.filters{padding:0 15px 16px}
+.filters label{flex-wrap:wrap}
+.filters label input{max-width:125px}
+.panel-heading{padding:20px 15px}
+.quiet{display:none}
+.connection{display:flex;flex-wrap:wrap;padding:18px 15px}
+.connection>div{width:100%}
+.connection>svg{display:none}
+.action-bar{padding:18px 15px}
+.action-bar>div{flex-wrap:wrap}
+.review-layout{grid-template-columns:1fr}
+.result-list{display:flex;overflow:auto;flex-wrap:wrap}
+.result-list .panel-heading{width:100%}
+.result-list>button{width:50%;padding:15px}
+.result-list small{display:none}
+.result-summary{padding:20px}
+.result-counts{margin:0}
+.check-values{gap:7px}
+.check-values>div{padding:10px}
+.check-values strong{font-size:var(--font-body-small)}
+.review .panel-heading{padding:18px}
+.review-actions{padding:0 15px 18px;flex-wrap:wrap}
+.check-item{padding:18px 15px}
+.evidence{grid-template-columns:1fr}
+.folder-input{flex-wrap:wrap}
+.folder-input>input{width:100%;flex:auto}
+.folder-tree span{display:none}
+.pdf-pair{grid-template-columns:1fr;overflow:auto}
+.pdf{min-height:70vh}
+.modal-backdrop{padding:10px}
+.edit-fields{grid-template-columns:1fr}
+.edit-modal{max-height:95vh;overflow:auto}
+.footer{gap:var(--space-medium)}
+.history-row>span:not(.history-icon){display:none}
+.history-icon{padding:8px}
+.history-row{padding:18px;gap:var(--space-medium)}
+}
+.difference{margin-top:12px;font-size:var(--font-body);font-weight:600;color:#b36c4d}

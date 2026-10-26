@@ -1,0 +1,83 @@
+/*
+ * [파일 기능명세] 전송 전 문서 편집 3단 화면(DocEditor) 스타일.
+ * 입력: DocEditor·MarkdownPane·WysiwygPane·TocPane 의 클래스, src/style.css :root 의 토큰(--color-primary, --space-*, --font-*).
+ * 출력: 3열(1fr 1.2fr 220px) 독립 스크롤 배치, 흰 종이 편집 영역, 표·제목 서식, 목차 활성 행, 760px 이하 탭 화면.
+ * 처리 계약: 높이는 부모(.doc-edit-modal 등)가 정하고 .doc-editor 가 100% 로 채운다(flex/min-height:0).
+ *   .doc-edit-modal 은 여기서 정의하지 않는다. 앱에 다크 모드 규칙이 없으므로 라이트 팔레트만 둔다.
+ */
+.doc-editor{height:100%;min-height:0;display:flex;flex-direction:column;gap:var(--space-small)}
+.doc-panes{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1.2fr 220px;gap:var(--space-medium)}
+.doc-pane{min-width:0;min-height:0;overflow:auto;border:1px solid #dce2dc;border-radius:8px;background:var(--color-white)}
+.doc-editor [hidden]{display:none!important}
+
+/* 좌: 마크다운 원문 */
+.doc-pane-md{display:flex}
+.doc-md-textarea{flex:1;width:100%;min-height:0;border:0;resize:none;padding:12px;background:transparent;color:#25352e;
+  font-family:Consolas,"D2Coding","Courier New",monospace;font-size:13px;line-height:20px;white-space:pre;overflow:auto;tab-size:2}
+.doc-md-textarea:focus-visible{outline:3px solid #83b99a;outline-offset:-3px}
+
+/* 중: 워드형 종이 */
+.doc-pane-wysiwyg{background:#eef0ec;padding:var(--space-medium)}
+.doc-paper{min-height:100%;background:#fff;border-radius:3px;padding:28px 34px;box-shadow:0 1px 4px #00000022,0 6px 18px #0000000f;color:#25352e}
+.doc-prose{outline:none;min-height:240px;font-size:14px;line-height:1.7;overflow-wrap:anywhere}
+.doc-prose:focus-visible{outline:3px solid #83b99a;outline-offset:6px;border-radius:2px}
+.doc-prose p{margin:0 0 .7em}
+.doc-prose h1{font-size:24px;margin:.2em 0 .6em;letter-spacing:-.5px}
+.doc-prose h2{font-size:19px;margin:1.1em 0 .5em;padding-bottom:3px;border-bottom:1px solid #e4e8e2}
+.doc-prose h3{font-size:16px;margin:1em 0 .4em}
+.doc-prose h4,.doc-prose h5,.doc-prose h6{font-size:14px;margin:.9em 0 .3em}
+.doc-prose ul,.doc-prose ol{margin:0 0 .7em;padding-left:1.6em}
+.doc-prose li p{margin:0}
+.doc-prose code{background:#f0f3ee;border-radius:4px;padding:1px 4px;font-family:Consolas,monospace;font-size:.92em}
+.doc-prose pre{background:#f4f6f2;border-radius:6px;padding:10px 12px;overflow:auto}
+.doc-prose pre code{background:none;padding:0}
+.doc-prose blockquote{margin:0 0 .7em;padding-left:12px;border-left:3px solid #cfd8cf;color:#5d6b62}
+.doc-prose hr{border:0;border-top:1px solid #dce2dc;margin:1em 0}
+.doc-prose .tableWrapper{overflow-x:auto;margin:.4em 0 .9em}
+.doc-prose table{border-collapse:collapse;width:100%;table-layout:auto}
+.doc-prose th,.doc-prose td{border:1px solid #c9d2c9;padding:6px 9px;vertical-align:top;text-align:left;min-width:80px;word-break:keep-all;overflow-wrap:anywhere}
+.doc-prose th{background:#eaf2e9;font-weight:700}
+.doc-prose td p,.doc-prose th p{margin:0}
+.doc-prose .selectedCell{background:#dbe9dc}
+
+/* 우: 목차 + 안내 */
+.doc-pane-toc{padding:var(--space-medium);display:flex;flex-direction:column;gap:var(--space-small)}
+.doc-toc-title{font-size:var(--font-body);color:#536959;letter-spacing:.5px}
+.doc-toc-empty{font-size:var(--font-body);color:#869087}
+.doc-toc-list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.doc-toc-item{width:100%;justify-content:flex-start;text-align:left;font-size:var(--font-body);line-height:1.4;padding:6px 8px;border-radius:6px;color:#3c4d43;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;border-left:3px solid transparent}
+.doc-toc-item:hover{background:#f2f5ef}
+.doc-toc-item.toc-l1{font-weight:700}
+.doc-toc-item.toc-l2{padding-left:20px}
+.doc-toc-item.toc-l3{padding-left:34px;color:#66756b}
+.doc-toc-item.active{background:#eaf2e9;border-left-color:var(--color-primary);color:#286248;font-weight:700}
+.doc-side-info{margin-top:var(--space-small);padding-top:var(--space-medium);border-top:1px solid var(--color-divider);font-size:var(--font-body);line-height:1.6;color:#4d5d53}
+
+/* 탭 화면(760px 이하) */
+.doc-tabs{display:flex;gap:4px;border-bottom:1px solid #dce2dc}
+.doc-tab{flex:1;padding:10px 8px;font-size:var(--font-body);font-weight:600;color:#66756b;border-bottom:3px solid transparent;border-radius:6px 6px 0 0}
+.doc-tab.active{color:var(--color-primary);border-bottom-color:var(--color-primary);background:#eaf2e9}
+@media (max-width:760px){
+  .doc-panes{display:flex;flex-direction:column}
+  .doc-panes>.doc-pane{flex:1}
+  .doc-paper{padding:18px 16px}
+}
+
+/* 확인 창 통합: 3단 편집 화면을 담는 큰 창(StatementModal·ExpenseModal 입력 단계) */
+.statement-modal.doc-edit-modal{width:min(1500px,97vw);height:93vh;max-height:calc(100dvh - 48px)}
+.doc-edit-body.statement-body{display:flex;flex-direction:column;gap:var(--space-small);overflow:hidden;padding:12px 20px}
+.doc-edit-body>.doc-editor{flex:1}
+.doc-edit-body .alert{flex-shrink:0}
+.doc-edit-body .statement-problems{flex-shrink:0;max-height:84px;overflow:auto}
+.doc-edit-body .statement-notes{max-height:84px;overflow:auto}
+.doc-side-info .statement-info,.doc-side-info .statement-totals{grid-template-columns:1fr}
+.doc-side-info .statement-preview{padding:10px}
+.doc-side-info .statement-notes{max-height:none}
+.doc-discard{display:flex;align-items:center;gap:var(--space-small);flex-wrap:wrap}
+.doc-discard span{flex:1;min-width:160px}
+@media (max-width:760px){
+  .statement-modal.doc-edit-modal{width:100%;height:calc(100dvh - 48px)}
+  .doc-edit-body.statement-body{padding:10px 12px}
+}
+.statement-issue-hint{margin:0;font-size:var(--font-small);color:#7d8f73;line-height:1.5}

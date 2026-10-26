@@ -1,0 +1,57 @@
+/* [표시 기능명세] 거래명세서 생성(ContractDetail 버튼·StatementModal): 상세 제목줄 버튼과 꺼진 이유 안내, 확인 창의 입력·품목 행·미리보기·결과.
+ * 창은 머리·버튼줄을 고정하고 본문(statement-body)만 스크롤한다. 품목 행은 5칸 격자이며 600px 이하에서는 번호·품목명 한 줄,
+ * 규격·월금액 한 줄로 세로 배치한다. 줄 수 초과(.over)는 빨간색. 버튼 활성·검증 판단은 TSX와 서버가 한다. */
+.contracts-detail .panel-heading{flex-wrap:wrap;align-items:flex-start}
+.statement-action{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:auto;max-width:100%}
+.statement-hint{font-size:var(--font-small);color:#a08758;text-align:right}
+.statement-modal{width:min(760px,100%);max-height:calc(100dvh - 48px);display:flex;flex-direction:column}
+.statement-modal>header,.statement-modal>.modal-actions{flex-shrink:0}
+.statement-body{padding:20px 25px;display:grid;gap:16px;overflow-y:auto;min-height:0}
+.statement-body .alert{margin:0}
+.statement-notes{align-items:flex-start}
+.statement-notes ul,.statement-problems{margin:0;padding-left:18px;display:grid;gap:4px}
+.statement-info,.statement-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:var(--space-small);margin:0}
+.statement-info>div,.statement-totals>div{border:1px solid #e6ecde;border-radius:6px;background:var(--color-white);padding:9px 11px;min-width:0}
+.statement-info>div.wide{grid-column:1 / -1}
+.statement-info dt,.statement-totals dt{font-size:var(--font-small);color:#819574;margin-bottom:5px}
+.statement-info dd,.statement-totals dd{margin:0;font-size:var(--font-body);color:#375e41;overflow-wrap:anywhere}
+.statement-totals dd{font-weight:600;font-variant-numeric:tabular-nums}
+.statement-body .statement-fields{padding:0;gap:14px 18px}
+.statement-fields small{display:block;margin-top:6px;font-size:var(--font-small);color:#98a68c}
+.statement-items{display:grid;gap:var(--space-small);min-width:0}
+.statement-items-title{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.statement-items-title h3{font-size:var(--font-body);color:#627452}
+.statement-items-title .secondary{min-height:32px;padding:7px 12px}
+.statement-item{display:grid;grid-template-columns:24px minmax(0,1.4fr) minmax(0,1fr) minmax(0,130px) 34px;gap:var(--space-small);align-items:center;min-width:0}
+.statement-item input{width:100%;font-size:var(--font-body);padding:8px 10px}
+.statement-item input[aria-invalid=true]{border-color:#d9907a}
+.statement-item-head{font-size:var(--font-small);color:#819574}
+.statement-item-no{font-size:var(--font-body-small);color:#819574;text-align:center}
+.statement-preview{display:grid;gap:10px;padding:14px;border:1px dashed #d5e0c9;border-radius:8px;background:#fbfcf8}
+.statement-preview p{font-size:var(--font-body);color:#55694b}
+.statement-preview p span{color:#98a68c;font-size:var(--font-body-small)}
+.statement-preview b.over{color:#b05b46}
+.statement-problems{font-size:var(--font-body-small);color:#a08758;line-height:1.6}
+.statement-path{display:grid;gap:6px;min-width:0}
+.statement-path label{font-size:var(--font-body-small);color:#859c6a}
+.statement-path>div{display:flex;gap:var(--space-small);min-width:0}
+.statement-path input{flex:1;min-width:0;font-size:var(--font-body)}
+.statement-path small{color:#668253}
+.statement-modal .modal-actions a.primary{text-decoration:none}
+@media(max-width:1024px){
+.statement-action{align-items:flex-start;margin-left:0}
+.statement-hint{text-align:left}
+}
+@media(max-width:600px){
+.statement-body{padding:15px}
+.statement-item-head{display:none}
+.statement-item{grid-template-columns:24px minmax(0,1fr) minmax(0,1fr) 34px;padding:8px 0;border-bottom:1px solid #edf1e7}
+.statement-item input:nth-of-type(1){grid-column:2 / 4}
+.statement-item input:nth-of-type(2){grid-column:2}
+.statement-item input:nth-of-type(3){grid-column:3}
+.statement-item .icon-btn{grid-column:4;grid-row:1}
+.statement-path>div{flex-wrap:wrap}
+.statement-path>div>button{width:100%}
+.statement-modal .modal-actions{flex-wrap:wrap}
+.statement-modal .modal-actions>*{flex:1 1 140px}
+}

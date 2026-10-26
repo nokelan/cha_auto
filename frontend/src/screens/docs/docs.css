@@ -1,0 +1,31 @@
+/* [파일 역할] 개발문서 화면(DocsScreen) 전용 스타일. 기존 색 토큰 계열을 재사용하며 다크 모드는 다루지 않는다.
+ * 표·코드블록·mermaid SVG는 자체 가로 스크롤로 페이지 가로 넘침을 막는다. */
+.docs-article{background:#fff;border:1px solid #e8ede2;border-radius:10px;padding:22px 26px;color:#3d5a45;font-size:13px;line-height:1.85;min-width:0;overflow-wrap:anywhere}
+.docs-article h1,.docs-article h2,.docs-article h3,.docs-article h4{color:#2c654b;line-height:1.4;margin:1.6em 0 .6em;scroll-margin-top:8px}
+.docs-article h1{font-size:20px;margin-top:0}
+.docs-article h2{font-size:17px;border-bottom:1px solid #edf1e7;padding-bottom:6px}
+.docs-article h3{font-size:15px}
+.docs-article h4{font-size:13px}
+.docs-article p,.docs-article ul,.docs-article ol{margin:.6em 0}
+.docs-article ul,.docs-article ol{padding-left:22px}
+.docs-article code{font-family:Consolas,'D2Coding',monospace;font-size:12px;background:#f3f6ee;padding:1px 5px;border-radius:4px}
+.docs-article pre{background:#f7f9f2;border:1px solid #e8eedf;border-radius:8px;padding:12px 14px;overflow-x:auto;max-width:100%}
+.docs-article pre code{background:none;padding:0;white-space:pre;overflow-wrap:normal}
+.docs-article blockquote{margin:.8em 0;padding:4px 14px;border-left:3px solid #b9d3c3;color:#6d8555;background:#fafcf6}
+.docs-scroll{overflow-x:auto;max-width:100%;margin:.8em 0}
+.docs-scroll table{border-collapse:collapse;font-size:12px;min-width:max-content}
+.docs-scroll th,.docs-scroll td{border:1px solid #e3eadb;padding:6px 10px;text-align:left;vertical-align:top;overflow-wrap:normal}
+.docs-scroll th{background:#f3f6ee;color:#4d6f58}
+.docs-mermaid{overflow-x:auto;max-width:100%;margin:1em 0;padding:8px;border:1px solid #e8eedf;border-radius:8px;background:#fff}
+.docs-mermaid svg{max-width:none;height:auto}
+.docs-mermaid-error{color:#a04a3a;font-size:12px;margin-bottom:6px}
+.docs-link-off{color:#91a677;text-decoration:underline dotted;cursor:help}
+.docs-article a{color:#2c654b}
+.docs-article a[data-doc]{cursor:pointer;text-decoration:underline}
+.docs-state{padding:26px;color:#859573;font-size:12px;text-align:center}
+.docs-state.error{color:#a04a3a}
+.docs-article img{max-width:100%}
+.related-list>.docs-current{background:#eaf3ec;border-color:#b9d3c3;font-weight:600}
+.related-toc{display:flex;flex-direction:column;gap:2px}
+.related-toc button{text-align:left;font-size:11px;line-height:1.6;color:#466b4d;padding:3px 6px;border-radius:6px;background:none;border:0;overflow-wrap:anywhere}
+.related-toc button:hover{background:#f1f6ec}

@@ -1,0 +1,4 @@
+/* [표시 기능명세] 공용 모달(Modal.tsx)의 최소 보완 스타일.
+ * 대화상자 자체(section.modal)를 프로그램으로 포커스할 때 브라우저 기본 포커스 링이 생기지 않게 한다.
+ * 모달의 모양은 modal-base.css의 .modal-backdrop/.modal 규칙이 담당하며 여기서 바꾸지 않는다. */
+.modal:focus{outline:none}

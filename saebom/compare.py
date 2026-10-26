@@ -1,8 +1,11 @@
 # [파일 기능명세]
 # PDF 텍스트 판독과 규칙 비교 엔진. 입력은 현재 양식의 텍스트 PDF 또는 추출 사전이며 출력은 값·근거·페이지·판정이다. OCR·AI·네트워크를 사용하지 않는다.
+# 처리 흐름: extract(진입점: 페이지 텍스트 읽기·검사) → extract_invoice / extract_contract(양식별 규칙) → compare(항목별 check와 최종 판정).
+# 페이지 제한(MAX_PDF_PAGES)과 자사 사업자번호는 config.OWN_BIZ를 호출 시점에 읽는다(import 시점에 복사하지 않음).
 # 유지보수: 함수·데이터 계약이 바뀌면 해당 기능명세와 실제 회귀 검사를 함께 갱신한다.
 
 """Conservative rules for the current groupware templates. No OCR, AI or network."""
+# 한글 설명: 현재 그룹웨어 양식에 맞춘 보수적 규칙 판독·비교 모듈(OCR·AI·네트워크 미사용).
 import calendar
 import re
 from datetime import date
@@ -11,8 +14,11 @@ from pathlib import Path
 
 import pdfplumber
 
-# 양식 토큰: 금액은 쉼표 포함 정수, 사업자번호는 3-2-5자리, 날짜는 한글 년·월·일과 선택 대괄호를 허용한다.
-MONEY = r"([\d,]+)"
+from . import config
+from .config import MAX_PDF_PAGES
+
+# 양식 토큰: 금액은 숫자로 시작하는 쉼표 포함 정수(쉼표만 있는 값은 매칭하지 않음), 사업자번호는 3-2-5자리, 날짜는 한글 년·월·일과 선택 대괄호를 허용한다.
+MONEY = r"(\d[\d,]*)"
 BIZ = r"\d{3}-\d{2}-\d{5}"
 DATE = r"\[?(\d{4})\]?년\s*\[?(\d{1,2})\]?월\s*\[?(\d{1,2})\]?\s*일"
 
@@ -40,17 +46,17 @@ def integer(s):
 
 
 # [기능명세] extract
-# 목적: PDF를 페이지 텍스트로 읽고 양식별 항목 추출
-# 입력: (path: Path, kind: str)
+# 목적: PDF를 페이지 텍스트로 읽고 양식별 항목 추출(진입점)
+# 입력: (path: Path, kind: str — 'invoice'이면 계산서, 그 외는 계약서)
 # 출력: fields/pages/error 사전; 필드에는 value/quote/page/method 포함
-# 처리: 100페이지 제한→페이지 텍스트 결합→30자 검사→invoice 또는 계약 패턴 검색
+# 처리: config.MAX_PDF_PAGES(100) 페이지 제한→페이지 텍스트 결합→30자 검사→extract_invoice 또는 extract_contract 호출
 # 예외/실패: 파일 열기·판독 실패는 error에 기록; 누락 필드는 생략
 # 부수효과: PDF 읽기만 수행; 파일·DB 수정과 네트워크 접속 없음
 def extract(path: Path, kind: str):
     try:
         with pdfplumber.open(path) as pdf:
-            if len(pdf.pages) > 100:
-                return {"error": "100페이지를 초과해 자동 판독하지 않았습니다.", "fields": {}, "pages": []}
+            if len(pdf.pages) > MAX_PDF_PAGES:
+                return {"error": f"{MAX_PDF_PAGES}페이지를 초과해 자동 판독하지 않았습니다.", "fields": {}, "pages": []}
             # 1단계: PDF.js 화면 렌더링과 별개로 각 페이지의 텍스트를 읽는다. OCR·좌표 영역 분석은 하지 않는다.
             pages = [{"page": n + 1, "text": p.extract_text() or ""} for n, p in enumerate(pdf.pages)]
     except Exception as e:
@@ -74,67 +80,89 @@ def extract(path: Path, kind: str):
 
     if len(re.sub(r"\s", "", text)) < 30:
         return {"error": "텍스트 추출 불가: 이미지 PDF는 지원하지 않습니다. OCR·AI 미사용.", "fields": {}, "pages": pages}
-    # 2단계: 계산서는 최초 매칭을 사용한다. 공급자 번호와 헤더 다음 줄 배치는 현재 양식에 의존한다.
     if kind == "invoice":
-        m = re.search(BIZ, text)
-        put("biz", m.group(0) if m else None, m)
-        m = re.search(r"상호\*?\s+(.+?)\s+성명", text)
-        put("partner", m.group(1).strip() if m else None, m)
-        m = re.search(r"작성일자\*?\s+공급가액\*?\s+세액\*?\s*\n(\d{4}-\d{2}-\d{2})\s+" + MONEY + r"\s+" + MONEY, text)
-        if m:
-            put("issued", m.group(1), m)
-            put("supply", integer(m.group(2)), m)
-            put("vat", integer(m.group(3)), m)
-        m = re.search(r"합계\s+현금[^\n]*\n(?:[^\n]*청구[^\n]*\n)?\s*" + MONEY, text)
-        if m:
-            put("total", integer(m.group(1)), m)
-        m = re.search(r"(\d{4})년\s*(\d{1,2})월분", text)
-        if m and 1 <= int(m.group(2)) <= 12:
-            put("month", f"{m.group(1)}-{int(m.group(2)):02d}", m)
-        m = re.search(r"(\d+)차분", text)
-        put("installment", int(m.group(1)) if m else None, m)
-        m = re.search(r"계약금액[^\n]*?(\d{1,3})%", text)
-        put("percent", int(m.group(1)) if m else None, m)
+        extract_invoice(text, put)
     else:
-        # 계약 분기: 을의 업체명·사업자번호·기간·월/총 금액·부가세 표현을 각각 찾는다.
-        m = re.search(r'["“]을["”]\s*:\s*([^\n]+)', text)
-        put("partner", m.group(1).strip() if m else None, m)
-        # Business numbers occur in the business information clause or signature table.
-        m = re.search(r"사업자등록번호(?:는|\s*[:：])?\s*(" + BIZ + ")", text)
-        if m:
-            numbers = re.findall(BIZ, text[m.start():m.end() + 35])
-            # Legacy contracts list 갑 (our company) before 을 (vendor).
-            val = numbers[-1] if len(numbers) > 1 and numbers[0] == "000-81-00001" else m.group(1)
-            put("biz", val, re.search(re.escape(val), text))
-        m = re.search(r"계약기간[^\n]*?" + DATE + r"부터\s*" + DATE + r"\s*까지", text)
-        if m:
-            try:
-                put("start", date(*map(int, m.groups()[:3])).isoformat(), m)
-                put("end", date(*map(int, m.groups()[3:])).isoformat(), m)
-            except ValueError:
-                pass
-        m = re.search(r"(월|총)\s*금\s*" + MONEY + r"원\s*\((부가가치세\s*(?:별도|포함))\)", text)
-        if m:
-            put("basis", "monthly" if m.group(1) == "월" else "total", m)
-            put("amount", integer(m.group(2)), m)
-            put("vat_mode", "included" if "포함" in m.group(3) else "excluded", m)
-        # 비율 수집은 같은 숫자를 중복 제거한다. 동일 비율 반복 차수와 범용 기성 청구의 식별 알고리즘은 아니다.
-        # Only explicitly enumerated ratios are eligible for automatic installment checks.
-        ratios = []
-        for m in re.finditer(r"(?:1차|2차|선급|잔금|검수|계약금)[^\n]{0,100}?([1-9]\d?|100)%", text):
-            p = int(m.group(1))
-            if p not in ratios:
-                ratios.append(p)
-        if ratios:
-            m = re.search(r"[^\n]*(?:70%|30%|\d+%)[^\n]*", text)
-            put("ratios", ratios, m)
-        m = re.search(r"[^\n]*(?:익월말|다음 달 말일)[^\n]*", text)
-        if m:
-            put("payment", "발행·청구 다음 달 말일", m)
-        m = re.search(r"[^\n]*(?:검수|설치)[^\n]*지급[^\n]*", text)
-        if m:
-            put("condition", m.group(0).strip(), m)
+        extract_contract(text, put)
     return {"fields": fields, "pages": pages, "error": None}
+
+
+# [기능명세] extract_invoice
+# 목적: 세금계산서 텍스트에서 항목 추출
+# 입력: (text: 전체 페이지 텍스트, put: put(key, value, match) 기록 함수)
+# 출력: None(결과는 put으로 기록)
+# 처리: 최초 매칭 사용 — 사업자번호(첫 번호=공급자), 상호, 작성일자·공급가액·세액(헤더 다음 줄), 합계, 청구 월(1~12월만), 차수, 계약금액 비율
+# 예외/실패: 매칭이 없으면 해당 항목 생략; 금액 정수화 실패는 ValueError 전파
+# 부수효과: put을 통해 호출자의 fields 갱신
+def extract_invoice(text, put):
+    # 2단계: 계산서는 최초 매칭을 사용한다. 공급자 번호와 헤더 다음 줄 배치는 현재 양식에 의존한다.
+    m = re.search(BIZ, text)
+    put("biz", m.group(0) if m else None, m)
+    m = re.search(r"상호\*?\s+(.+?)\s+성명", text)
+    put("partner", m.group(1).strip() if m else None, m)
+    m = re.search(r"작성일자\*?\s+공급가액\*?\s+세액\*?\s*\n(\d{4}-\d{2}-\d{2})\s+" + MONEY + r"\s+" + MONEY, text)
+    if m:
+        put("issued", m.group(1), m)
+        put("supply", integer(m.group(2)), m)
+        put("vat", integer(m.group(3)), m)
+    m = re.search(r"합계\s+현금[^\n]*\n(?:[^\n]*청구[^\n]*\n)?\s*" + MONEY, text)
+    if m:
+        put("total", integer(m.group(1)), m)
+    m = re.search(r"(\d{4})년\s*(\d{1,2})월분", text)
+    if m and 1 <= int(m.group(2)) <= 12:
+        put("month", f"{m.group(1)}-{int(m.group(2)):02d}", m)
+    m = re.search(r"(\d+)차분", text)
+    put("installment", int(m.group(1)) if m else None, m)
+    m = re.search(r"계약금액[^\n]*?(\d{1,3})%", text)
+    put("percent", int(m.group(1)) if m else None, m)
+
+
+# [기능명세] extract_contract
+# 목적: 계약서 텍스트에서 항목 추출
+# 입력: (text: 전체 페이지 텍스트, put: put(key, value, match) 기록 함수)
+# 출력: None(결과는 put으로 기록)
+# 처리: 을의 업체명·사업자번호(자사 config.OWN_BIZ가 먼저 나오면 마지막 번호)·계약기간·월/총 금액과 부가세 표현·분할 비율·지급 기한·지급 조건 검색
+# 예외/실패: 매칭이 없거나 날짜가 잘못되면 해당 항목 생략; 금액 정수화 실패는 ValueError 전파
+# 부수효과: put을 통해 호출자의 fields 갱신
+def extract_contract(text, put):
+    # 계약 분기: 을의 업체명·사업자번호·기간·월/총 금액·부가세 표현을 각각 찾는다.
+    m = re.search(r'["“]을["”]\s*:\s*([^\n]+)', text)
+    put("partner", m.group(1).strip() if m else None, m)
+    # Business numbers occur in the business information clause or signature table.
+    m = re.search(r"사업자등록번호(?:는|\s*[:：])?\s*(" + BIZ + ")", text)
+    if m:
+        numbers = re.findall(BIZ, text[m.start():m.end() + 35])
+        # Legacy contracts list 갑 (our company) before 을 (vendor).
+        val = numbers[-1] if len(numbers) > 1 and numbers[0] == config.OWN_BIZ else m.group(1)
+        put("biz", val, re.search(re.escape(val), text))
+    m = re.search(r"계약기간[^\n]*?" + DATE + r"부터\s*" + DATE + r"\s*까지", text)
+    if m:
+        try:
+            put("start", date(*map(int, m.groups()[:3])).isoformat(), m)
+            put("end", date(*map(int, m.groups()[3:])).isoformat(), m)
+        except ValueError:
+            pass
+    m = re.search(r"(월|총)\s*금\s*" + MONEY + r"원\s*\((부가가치세\s*(?:별도|포함))\)", text)
+    if m:
+        put("basis", "monthly" if m.group(1) == "월" else "total", m)
+        put("amount", integer(m.group(2)), m)
+        put("vat_mode", "included" if "포함" in m.group(3) else "excluded", m)
+    # 비율 수집은 같은 숫자를 중복 제거한다. 동일 비율 반복 차수와 범용 기성 청구의 식별 알고리즘은 아니다.
+    # Only explicitly enumerated ratios are eligible for automatic installment checks.
+    ratios = []
+    for m in re.finditer(r"(?:1차|2차|선급|잔금|검수|계약금)[^\n]{0,100}?([1-9]\d?|100)%", text):
+        p = int(m.group(1))
+        if p not in ratios:
+            ratios.append(p)
+    if ratios:
+        m = re.search(r"[^\n]*(?:70%|30%|\d+%)[^\n]*", text)
+        put("ratios", ratios, m)
+    m = re.search(r"[^\n]*(?:익월말|다음 달 말일)[^\n]*", text)
+    if m:
+        put("payment", "발행·청구 다음 달 말일", m)
+    m = re.search(r"[^\n]*(?:검수|설치)[^\n]*지급[^\n]*", text)
+    if m:
+        put("condition", m.group(0).strip(), m)
 
 
 # [기능명세] val
@@ -164,13 +192,14 @@ def compare(invoice, contract, group=None):
 
     # [기능명세] compare.check
     # 목적: 항목 판정과 양쪽 원문 근거를 결과에 추가
-    # 입력: (key, label, actual, expected, *, unknown=None, note='', sources=None)
+    # 입력: (key, label, actual, expected, *, unknown=None, note='', sources=None, status=None)
     # 출력: None
-    # 처리: 실제값·기준값·unknown에 따라 판정하고 두 값이 int이면 차이 계산
-    # 예외/실패: 어느 값이 None이거나 unknown이 있으면 확인 필요
+    # 처리: status가 주어지면 그 판정을 그대로 쓰고, 없으면 실제값·기준값·unknown에 따라 판정. 두 값이 int이면 차이 계산. note는 unknown이 우선
+    # 예외/실패: status 미지정 시 어느 값이 None이거나 unknown이 있으면 확인 필요
     # 부수효과: 부모 compare의 checks 목록에 항목 추가
-    def check(key, label, actual, expected, *, unknown=None, note="", sources=None):
-        status = "확인 필요" if unknown or actual is None or expected is None else "일치" if actual == expected else "불일치"
+    def check(key, label, actual, expected, *, unknown=None, note="", sources=None, status=None):
+        if status is None:
+            status = "확인 필요" if unknown or actual is None or expected is None else "일치" if actual == expected else "불일치"
         checks.append({"key": key, "label": label, "actual": actual, "expected": expected, "status": status,
                        "difference": actual - expected if type(actual) is int and type(expected) is int else None,
                        "note": unknown or note, "invoice_source": invoice.get("fields", {}).get((sources or (key, key))[0]),
@@ -220,9 +249,10 @@ def compare(invoice, contract, group=None):
     elif month and start and end:
         y, m = map(int, month.split("-"))
         lo, hi = date(y, m, 1).isoformat(), date(y, m, calendar.monthrange(y, m)[1]).isoformat()
-        check("period", "청구기간 / 계약기간", f"{lo} ~ {hi}", f"{start} ~ {end}", sources=("month", "start"))
-        checks[-1]["status"] = "일치" if start <= lo and hi <= end else "불일치"
-        checks[-1]["note"] = "청구 월 전체가 명시된 계약기간 안에 있는지 확인. 갱신 계약은 별도로 확인하세요."
+        # 기간 판정은 문자열 동일 비교가 아니라 청구 월 전체가 계약기간 안에 있는지로 정한다.
+        check("period", "청구기간 / 계약기간", f"{lo} ~ {hi}", f"{start} ~ {end}", sources=("month", "start"),
+              status="일치" if start <= lo and hi <= end else "불일치",
+              note="청구 월 전체가 명시된 계약기간 안에 있는지 확인. 갱신 계약은 별도로 확인하세요.")
     else:
         check("period", "청구기간 / 계약기간", month, f"{start or '?'} ~ {end or '?'}", unknown="청구 대상 월 또는 계약기간을 추출하지 못했습니다. 발행일로 대신하지 않습니다.", sources=("month", "start"))
     if basis == "monthly":

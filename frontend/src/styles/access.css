@@ -1,0 +1,12 @@
+/* [표시 기능명세] 시작 비밀번호 화면: 화면 높이 중앙 정렬·모바일 폭 제한·오류/입력 표시. 인증 성공 여부는 서버 응답으로 판단한다. */
+.access-screen{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;color:#5d7859;background:#f3f6ee}
+.access-card{width:min(420px,100%);padding:36px 30px;background:var(--color-white);border:1px solid #e1e8da;border-radius:16px;box-shadow:0 14px 60px #29432a0d}
+.access-logo{width:60px;height:60px;display:grid;place-items:center;background:var(--color-primary);color:var(--color-white);border-radius:18px;margin-bottom:24px}
+.access-card h1{font-size:25px}
+.access-card>p{font-size:var(--font-body);line-height:1.9;margin:12px 0 25px;color:#8a9980}
+.access-card form{display:flex;flex-direction:column;gap:var(--space-medium)}
+.access-card label{font-size:var(--font-body);font-weight:600}
+.access-card input{width:100%;min-height:46px;letter-spacing:5px;font-size:20px}
+.access-card form p{font-size:var(--font-body);color:#b35f49;line-height:1.8}
+.access-card .primary{margin-top:5px}
+.access-card small{display:block;font-size:var(--font-small);line-height:1.9;margin-top:24px;color:#9ca78f}

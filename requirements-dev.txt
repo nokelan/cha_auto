@@ -1,0 +1,5 @@
+# 개발·회귀 검사·Windows 배포 생성 의존성. 실행 의존성도 함께 설치한다.
+-r requirements.txt
+pyinstaller==6.18.0
+httpx==0.28.1
+pytest==8.4.2

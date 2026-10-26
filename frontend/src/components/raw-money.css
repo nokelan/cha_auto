@@ -1,0 +1,23 @@
+/* [표시 기능명세] 원 추출 금액 패널: 문서 최초 추출과 수동 보정 적용값을 구분한다. 긴 원문은 내부에서 줄바꿈하고, 비교 열의 너비에 따라 카드가 재배치된다. */
+.raw-money-panel{margin:0 14px 18px;padding:16px;border:1px solid #dce6d6;border-radius:9px;background:#f8fbf5;min-width:0}
+.raw-money-panel>header{display:flex;justify-content:space-between;align-items:center;gap:var(--space-small);flex-wrap:wrap;margin-bottom:13px}
+.raw-money-panel h3{font-size:13px;color:#3c6145}
+.raw-money-panel>header>span{font-size:var(--font-small);color:#839478}
+.raw-money-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:var(--space-medium);min-width:0}
+.raw-money-document{min-width:0;background:var(--color-white);border:1px solid #e3eadc;border-radius:7px;padding:12px}
+.raw-money-document h4{font-size:var(--font-body);margin:0 0 11px;color:#566f49}
+.raw-money-document h4 span{font-size:var(--font-small);font-weight:400;color:#91a181;margin-left:5px}
+.raw-money-values{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,120px),1fr));gap:9px}
+.raw-money-field{min-width:0;display:flex;flex-direction:column;gap:var(--space-small);padding:10px;border:1px solid #edf1e7;border-radius:6px;background:#fcfdf9}
+.raw-money-field>small{font-size:var(--font-small);color:#819574}
+.raw-money-field>strong{font-size:14px;color:#375e41;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.raw-money-field .raw-money-missing{font-size:var(--font-body);color:#a08758}
+.raw-money-corrected{font-size:var(--font-small);line-height:1.8;color:#956441;overflow-wrap:anywhere}
+.raw-money-corrected b{display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fff0df;color:#996237;font-weight:500}
+.raw-money-field details{min-width:0;margin-top:2px;font-size:var(--font-small);color:#899b7b}
+.raw-money-field summary{cursor:pointer;line-height:1.8}
+.raw-money-field pre{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font:10px/1.9 "Malgun Gothic",sans-serif;color:#687b5a;background:#f1f6eb;border-radius:4px;padding:9px;margin:8px 0 0;max-height:210px;overflow:auto}
+.raw-money-no-source{font-size:var(--font-small);color:#a2ad96}
+.raw-money-conditions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+.raw-money-conditions span{font-size:var(--font-small);color:#6a8258;background:#f1f6e9;padding:4px 7px;border-radius:4px}
+.raw-money-help{font-size:var(--font-small);line-height:1.8;color:#8b9b7d;margin-top:12px}

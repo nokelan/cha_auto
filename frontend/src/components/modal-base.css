@@ -1,0 +1,28 @@
+/* [표시 기능명세] 모달 외곽: 고정 배경·상단 z-index·중앙 정렬. 문서/보정 모달의 독립 스크롤을 지원한다. */
+.modal-backdrop{position:fixed;inset:0;z-index:20;background:#1a2b23b3;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:#f9fbf5;border:1px solid #d9e2ce;border-radius:12px;overflow:hidden;box-shadow:0 20px 100px #0003}
+.modal>header{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 25px;border-bottom:1px solid #e5ebdb;background:var(--color-white)}
+.modal h2{font-size:17px;color:#627b4c}
+.modal header p{font-size:var(--font-small);color:#9daf8b;margin-top:8px}
+.icon-btn{padding:7px;color:#8ca274}
+/* [표시 기능명세] 원문 모달: 좌우 PDF 그리드, 도구줄은 고정 높이, 본문만 스크롤. 작은 화면은 아래 미디어 규칙에서 세로 전환한다. */
+.pdf-modal{width:min(1500px,97vw);height:93vh;display:flex;flex-direction:column}
+.pdf-pair{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-medium);padding:12px;min-height:0;flex:1}
+.pdf{background:#e5e9df;min-height:0;overflow:hidden;display:flex;flex-direction:column;border-radius:7px}
+.pdf-tools{display:flex;align-items:center;gap:10px;background:var(--color-white);padding:12px;color:#83976c;font-size:var(--font-small);border-bottom:1px solid #e4eadb;flex-wrap:wrap}
+.pdf-tools>span{flex:1;min-width:0;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-tools>div{display:flex;gap:5px;align-items:center}
+.pdf-tools b{font-size:var(--font-small);font-weight:400}
+.pdf-tools button{padding:4px}
+.pdf-tools a{color:#66804e;text-decoration:underline}
+.pdf-body{overflow:auto;padding:16px;flex:1;text-align:center}
+.pdf-body canvas{max-width:100%;height:auto;background:var(--color-white);box-shadow:0 2px 10px #0001}
+.pdf-body p{font-size:var(--font-body-small);margin:10px 0 20px}
+.edit-modal{width:630px}
+.edit-fields{padding:25px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.edit-fields label{font-size:var(--font-body-small);color:#859c6a}
+.edit-fields input{display:block;width:100%;margin-top:9px;font-size:var(--font-body)}
+.modal-actions{border-top:1px solid #e4ebd8;padding:20px 25px;display:flex;justify-content:flex-end;gap:9px}
+.closed{height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:25px;color:#748e5b;text-align:center;padding:30px}
+.closed p{color:#a1ae91;line-height:1.9}
+.spin{animation:rotate 1.2s linear infinite}

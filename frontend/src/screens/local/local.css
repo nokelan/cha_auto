@@ -1,0 +1,55 @@
+/* [표시 기능명세] 로컬 세금계산서 대조 화면(LocalAuditScreen): 위 폴더 패널, 결과 요약, 표·상세 2단(contracts-layout 재사용).
+ * 1900px 미만은 표 위·상세 아래 1단으로 쌓는다. 표는 table-wrap 안에서만 가로·세로 스크롤하고 머리줄은 고정한다.
+ * 판정 배지 gray(대조 전), 공급가액 차이(.local-diff)는 빨간색 굵게. 버튼 활성·판정 판단은 TSX와 서버가 한다. */
+.badge.gray{background:#f1f2ef;color:#7f877a}
+.local-folder-body{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 16px;padding:0 25px 22px;min-width:0}
+.local-folder{flex:1 1 360px;min-width:0}
+.local-folder code{margin:0;font-size:var(--font-body);color:#375e41}
+.local-folder code.missing{color:#a08758}
+.local-actions{display:flex;flex-wrap:wrap;gap:var(--space-small)}
+.local-actions .primary{margin-top:0}
+.local-meta{flex-basis:100%;display:grid;gap:4px;font-size:var(--font-body-small);color:#7b8b72;line-height:1.6}
+.local-meta .statement-hint{text-align:left}
+.local-summary{margin-bottom:0}
+.local-summary .result-counts{flex-wrap:wrap}
+.local-layout{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+.local-table-wrap{max-height:65vh;border-top:1px solid #edf1e7}
+.local-table th{position:sticky;top:0;z-index:1;border-top:0}
+.local-table{min-width:1080px}
+.local-table td,.local-table th{padding:12px 12px;vertical-align:top;overflow-wrap:normal;word-break:keep-all}
+.local-partner{min-width:90px}
+.local-table td:first-child,.local-table th:first-child{width:auto;padding-left:18px}
+.local-table tbody tr{cursor:pointer}
+.local-table .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.local-table .nowrap{white-space:nowrap}
+.local-file{display:flex;align-items:flex-start;justify-content:flex-start;gap:6px;text-align:left;padding:0;min-width:180px;max-width:280px;font-size:var(--font-body-small);color:#3c6145}
+.local-file[aria-pressed=true] .local-file-name{font-weight:700}
+.local-file .file-tag{flex-shrink:0}
+.local-file-name{overflow-wrap:anywhere;word-break:break-all;line-height:1.6}
+.local-source{display:block;margin-top:4px;font-size:9px;color:#a08758}
+.local-contract{display:grid;gap:4px;min-width:150px}
+.local-contract>span{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.local-contract small{font-size:var(--font-small);color:#929e86;line-height:1.5}
+.local-diff{color:#b05b46;font-weight:700}
+.local-note{font-size:var(--font-body);line-height:1.7;color:#55694b;background:#f5f8ef;border-radius:6px;padding:10px 12px}
+.local-subtitle{font-size:var(--font-body);color:#627452;margin:0 0 8px}
+.local-checks>.local-subtitle{padding:4px 24px 12px}
+.local-candidates{border:1px solid #eee3c4;border-radius:6px;background:#fffdf6;padding:10px 12px}
+.local-candidates h3{font-size:var(--font-body);color:#8a7440;margin-bottom:8px}
+.local-candidates ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.local-candidates li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:var(--font-body-small);color:#55694b}
+.local-candidates li.chosen{font-weight:700}
+.local-candidates small{flex-basis:100%;color:#929e86}
+.local-pdf{padding-top:14px;border-top:1px solid #edf1e5}
+@media(max-width:1899px){
+.local-layout{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:600px){
+.local-folder-body{padding:0 15px 18px}
+.local-folder{flex-basis:100%}
+.local-actions{width:100%}
+.local-actions>button{flex:1 1 140px}
+.local-table-wrap{max-height:60vh}
+.local-checks>.local-subtitle{padding:4px 15px 10px}
+.local-summary .result-counts{gap:var(--space-small)}
+}

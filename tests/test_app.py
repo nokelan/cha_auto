@@ -305,7 +305,10 @@ def test_api_auth_origin_and_offline_workflow(tmp_path, monkeypatch):
             if jobs[0]["status"] != "running": break
             time.sleep(.02)
         assert jobs[0]["status"] == "done"
-        result = client.get("/api/results").json()[0]
+        # 이력 목록은 요약만 주므로 행 상세는 /api/results/{id}로 다시 조회한다.
+        summary = client.get("/api/results").json()[0]
+        assert summary["count"] == 1 and summary["mail_ids"] == ["m1"]
+        result = client.get(f"/api/results/{summary['id']}").json()
         assert result["rows"][0]["status"] == "일치"
         assert client.get(f"/api/results/{result['id']}/csv").status_code == 200
         docid = result["rows"][0]["invoice"]["id"]
@@ -318,8 +321,10 @@ def test_api_auth_origin_and_offline_workflow(tmp_path, monkeypatch):
             if len(rr) == 2: break
             time.sleep(.02)
         assert rr[0]["parent"] == result["id"]
-        assert rr[0]["rows"][0]["status"] == "불일치"
-        assert rr[0]["rows"][0]["effective_invoice"]["fields"]["vat"]["previous"]["value"] == 180000
+        assert rr[0]["mismatch"] == 1
+        latest = client.get(f"/api/results/{rr[0]['id']}").json()
+        assert latest["rows"][0]["status"] == "불일치"
+        assert latest["rows"][0]["effective_invoice"]["fields"]["vat"]["previous"]["value"] == 180000
         assert client.put("/api/settings", json={"document_root": str(tmp_path / "userdocs")}).status_code == 200
         for kind in ("invoice", "contract"):
             d = result["rows"][0][kind]

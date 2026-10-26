@@ -1,0 +1,10 @@
+/* [표시 기능명세] PDF 확대 도구: 독립 배율·화면 맞춤 버튼, Canvas hidden과 키보드 포커스 표시. 실제 재렌더와 스크롤 계산은 Pdf 담당. */
+.pdf-zoom-tools{display:flex;align-items:center;gap:6px;background:#f7faf3;border-bottom:1px solid #dce5d4;padding:7px 10px;flex-shrink:0;flex-wrap:wrap;font-size:var(--font-body-small);color:#718665}
+.pdf-zoom-tools>span{margin-right:auto;font-size:var(--font-small)}
+.pdf-zoom-tools button{border:1px solid #d6e0cd;background:var(--color-white);border-radius:5px;min-width:28px;min-height:28px;font-size:17px}
+.pdf-zoom-tools output{min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
+.pdf-zoom-tools .fit-button{font-size:var(--font-small);padding:4px 8px}
+.pdf-body{text-align:left;scrollbar-gutter:stable}
+.pdf-body canvas{display:block;height:auto}
+.pdf-body canvas[hidden]{display:none}
+.pdf-body canvas:focus-visible{outline:3px solid #719b70;outline-offset:2px}

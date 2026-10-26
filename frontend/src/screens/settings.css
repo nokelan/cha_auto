@@ -1,0 +1,18 @@
+/* [표시 기능명세] 설정 폼·폴더 트리·사이트 연결 정보. 긴 경로를 줄바꿈해 화면 폭을 넘기지 않는다. */
+.settings-grid{display:grid;grid-template-columns:1fr;gap:22px;max-width:940px}
+.settings-body{padding:0 26px 26px}
+.field-label{font-size:var(--font-body-small);color:#859573;display:block;margin:8px 0 11px}
+.folder-input{display:flex;gap:9px}
+.folder-input>input{flex:1;font-size:var(--font-body)}
+.folder-tree{margin:20px 0;padding:22px;background:#f7f9f2;border:1px solid #e8eedf;border-radius:8px;color:#8ca173;font-size:var(--font-body)}
+.folder-tree>strong{font-size:var(--font-body-small);font-weight:500;margin-left:8px;overflow-wrap:anywhere}
+.folder-tree>div{margin:15px 0 0 22px;font-size:var(--font-body-small);color:#728c59}
+.folder-tree span{font-size:var(--font-small);color:#a6b293;margin-left:18px}
+.help{font-size:var(--font-body-small);line-height:1.9;color:#a0ad8d;margin-bottom:20px;overflow-wrap:anywhere}
+.site-address{display:flex;align-items:center;gap:13px;padding:15px;background:#f7f9f1;border-radius:6px;margin-bottom:18px;color:#8ba16f}
+.site-address strong{font-size:var(--font-body);color:#6d8555}
+.site-address p{font-size:var(--font-body-small);color:#a3af91;margin-top:7px}
+.setting-note{display:flex;align-items:flex-start;gap:13px;margin-bottom:24px;color:#91a677}
+.setting-note strong{font-size:var(--font-body);color:#7c9262}
+.setting-note p{font-size:var(--font-body-small);color:#a1ae8f;line-height:1.9;margin-top:8px}
+.settings-body code{font-size:var(--font-body-small);color:#8a9d73;background:#f7f9f1;padding:10px;display:block;overflow-wrap:anywhere;margin-bottom:20px}

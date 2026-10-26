@@ -1,0 +1,71 @@
+/* [파일 기능명세] 모든 업무 메뉴를 한 viewport 안의 본문·관련 링크 두 영역으로 표시한다.
+ * 입력: App의 workspace-layout/main, RelatedLinks와 화면 폭.
+ * 출력: 고정 앱 골격, 독립 스크롤하는 왼쪽 본문과 오른쪽 링크. 모바일은 위아래 배치.
+ * 처리 규칙: 업무 버튼·모달·API 동작은 변경하지 않는다. 본문 내부의 표·PDF 스크롤은 유지한다.
+ * 예외: 짧거나 좁은 화면도 각 영역의 최소 높이를 확보하고 키보드로 스크롤할 수 있다. */
+html{height:100%;overflow:hidden;scrollbar-gutter:auto}
+body,#root{height:100%;overflow:hidden}
+.shell{height:100dvh;min-height:0;overflow:hidden}
+.shell>.sidebar{position:fixed;max-height:100dvh;overflow-y:auto}
+.shell>main{height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.topbar{flex-shrink:0}
+.content.workspace-layout{display:grid;grid-template-columns:minmax(0,1fr) 264px;gap:20px;flex:1;min-height:0;min-width:0;max-width:none;width:100%;margin:0;padding:20px 20px 16px}
+.workspace-main{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:4px 5px 0 0;scrollbar-gutter:stable;container-type:inline-size;container-name:workspace-content}
+.workspace-main:focus-visible,.related-links:focus-visible{outline:2px solid #83b99a;outline-offset:-2px}
+.workspace-main>.footer{padding:24px 0 12px}
+.related-links{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;align-self:stretch;border:1px solid #e1e7dc;border-radius:12px;background:var(--color-white);padding:20px 16px;scrollbar-gutter:stable}
+.related-heading{display:flex;align-items:center;gap:10px;padding-bottom:20px;border-bottom:1px solid var(--color-divider)}
+.related-heading h2{font-size:15px;color:#375e41;font-weight:700;letter-spacing:-.3px}
+.related-heading p{font-size:10px;color:#899680;line-height:1.7;margin-top:5px}
+.related-icon{width:34px;height:34px;display:grid;place-items:center;background:#eef5e9;color:#397353;border-radius:10px;flex-shrink:0}
+.related-section{margin-top:22px}
+.related-section h3{font-size:11px;letter-spacing:.3px;color:#71836a;margin-bottom:10px;font-weight:600}
+.related-list{display:grid;gap:6px}
+.related-list>a,.related-list>button{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:9px;padding:11px 10px;text-align:left;font-size:11px;line-height:1.7;color:#466b4d;border:1px solid #e8ede2;border-radius:8px;background:#fbfcf8;min-width:0}
+.related-list>a:hover,.related-list>button:hover{background:#eff5e9;border-color:#d1dfc8}
+.related-list span{flex:1;min-width:0;overflow-wrap:anywhere}
+.related-list svg:last-child{color:#8d9e80}
+.related-empty{font-size:11px;color:#97a18d;line-height:1.9;margin-top:9px}
+.related-footnote{font-size:10px;color:#9aa58f;line-height:1.9;margin-top:26px;padding-top:16px;border-top:1px solid var(--color-divider)}
+/* [반응형 명세] 본문 자체 폭에 따라 기존 내부 화면을 재배치한다. 브라우저 폭보다 본문의 가용 폭이 기준이다. */
+@container workspace-content (max-width:1100px){
+  .contracts-layout{grid-template-columns:minmax(0,1fr)}
+  .contracts-rows{max-height:48dvh}
+  .contracts-pdf-view{height:65dvh;min-height:320px}
+}
+@container workspace-content (max-width:900px){
+  .compare-workspace{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px}
+  .column-divider{display:none}
+  .workspace-results{grid-column:1 / -1}
+  .workspace-results .review-layout{display:flex;flex-direction:column}
+  .workspace-help{display:none}
+  .workspace-info>span:nth-child(2){margin-left:0}
+}
+@container workspace-content (max-width:560px){
+  .compare-workspace{grid-template-columns:minmax(0,1fr)}
+  .workspace-results{grid-column:auto}
+  .heading-line{align-items:flex-start;flex-direction:column}
+  .folder-input{flex-wrap:wrap}
+  .folder-input>input{flex-basis:100%;width:100%}
+  .contracts-import-body>label:not(.contracts-check){flex:1 1 130px}
+  .contracts-import-action{flex-basis:100%}
+}
+/* [반응형 명세] 모바일은 본문 위·관련 링크 아래로 놓되 각각 내부 스크롤한다. */
+@media(max-width:1100px){
+  .content.workspace-layout{grid-template-columns:minmax(0,1fr) 230px;gap:14px;padding:16px 14px 12px}
+}
+@media(max-width:760px){
+  .content.workspace-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(140px,25dvh);gap:12px;padding:14px 12px 10px}
+  .related-links{padding:14px}
+  .related-heading{padding-bottom:12px}
+  .related-section{margin-top:14px}
+}
+@media(max-width:600px){
+  .content.workspace-layout{padding:12px 8px 8px;gap:10px}
+  .workspace-main{padding-right:2px}
+  .related-links{padding:12px}
+  .related-heading h2{font-size:14px}
+}
+@media(max-height:540px) and (max-width:760px){
+  .content.workspace-layout{grid-template-rows:minmax(0,1fr) minmax(100px,28dvh)}
+}

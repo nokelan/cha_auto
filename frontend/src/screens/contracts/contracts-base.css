@@ -1,0 +1,54 @@
+/* [표시 기능명세] 계약서 목록 화면(ContractsScreen): 위 가져오기 조건 패널, 아래 목록·상세 2단(1024px 이하 1단).
+ * 모든 격자 칸은 minmax(0,…)/min-width:0으로 긴 계약명·경로가 화면 폭을 밀지 않게 한다. 원문 뷰어는 고정 높이 안에서만 스크롤한다. */
+.contracts-screen{display:grid;gap:18px;min-width:0}
+.contracts-import-body{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 18px;padding:0 25px 22px}
+.contracts-import-body>label{display:flex;flex-direction:column;min-width:0}
+.contracts-import-body .field-label{margin:0 0 7px}
+.contracts-import-body select,.contracts-import-body input[type=number]{width:150px;max-width:100%;font-size:var(--font-body);height:39px}
+.contracts-import-body input[aria-invalid=true]{border-color:#d9907a}
+.contracts-check{flex-direction:row!important;align-items:center;gap:var(--space-small);font-size:var(--font-body);color:#5e7551;min-height:39px}
+.contracts-import-action{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;flex:1 1 320px;min-width:0}
+.contracts-summary{display:grid;gap:4px;font-size:var(--font-body);color:#55694b;line-height:1.6;min-width:0}
+.contracts-summary small{font-size:var(--font-small);color:#98a68c}
+.contracts-alert{margin:0}
+.alert.amber{border:1px solid #eee3c4}
+.contracts-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;align-items:start;min-width:0}
+.contracts-layout>section{min-width:0}
+.contracts-list .search{min-width:0;flex:1 1 200px}
+.contracts-tabs{display:flex;gap:4px;background:#f3f6ef;border-radius:7px;padding:3px}
+.contracts-tabs button{font-size:var(--font-body-small);padding:7px 12px;border-radius:5px;color:#76866c}
+.contracts-tabs button.active{background:var(--color-white);color:var(--color-primary);font-weight:700;box-shadow:0 1px 2px #0000000d}
+.contracts-rows{max-height:70vh;overflow-y:auto;border-top:1px solid #edf1e7}
+.contracts-row{display:flex;flex-direction:column;align-items:stretch;gap:7px;width:100%;padding:15px 20px;text-align:left;border-bottom:1px solid #edf1e7;border-left:3px solid transparent;min-width:0}
+.contracts-row:hover{background:#f8faf5}
+.contracts-row.selected{background:#eef5e9;border-left-color:#397353}
+.contracts-row-top{display:flex;align-items:center;gap:var(--space-small);font-size:var(--font-body-small);color:#55694b}
+.contracts-row strong{font-size:13px;color:#3c6145;font-weight:600}
+.contracts-title{font-size:var(--font-body-small);color:#75846b;line-height:1.6}
+.contracts-row small{font-size:var(--font-small);color:#929e86;line-height:1.6}
+.contracts-pdf{margin-left:auto;font-size:var(--font-small);white-space:nowrap}
+.contracts-pdf.ok{color:#5f8a52}
+.contracts-pdf.missing{color:#b87655}
+.contracts-detail-body{padding:0 20px 20px;display:grid;gap:14px;min-width:0}
+.contracts-detail-body .alert{margin:0}
+.contracts-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:var(--space-small);margin:0}
+.contracts-fields>div{border:1px solid #edf1e7;border-radius:6px;background:#fcfdf9;padding:10px;min-width:0}
+.contracts-fields dt{font-size:var(--font-small);color:#819574;margin-bottom:6px}
+.contracts-fields dd{margin:0;font-size:var(--font-body);color:#375e41;overflow-wrap:anywhere}
+.contracts-fields dd.missing{color:#a08758}
+.contracts-pdf-view{height:75vh;min-height:420px;display:flex;flex-direction:column;min-width:0}
+.contracts-pdf-view>.pdf{flex:1}
+@media(max-width:1024px){
+.contracts-layout{grid-template-columns:minmax(0,1fr)}
+.contracts-rows{max-height:55vh}
+}
+@media(max-width:600px){
+.contracts-import-body{padding:0 15px 18px}
+.contracts-import-body>label:not(.contracts-check){flex:1 1 130px}
+.contracts-import-body select,.contracts-import-body input[type=number]{width:100%}
+.contracts-import-action{flex-basis:100%}
+.contracts-row{padding:14px 15px}
+.contracts-detail-body{padding:0 12px 12px}
+.contracts-pdf-view{height:65dvh;min-height:320px}
+.contracts-tabs{flex-wrap:wrap}
+}

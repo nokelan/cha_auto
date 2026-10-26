@@ -1,0 +1,39 @@
+/* [파일 역할] 계약 행 작업 버튼·상태와 지출결의서 확인/검토 창의 배치.
+ * [표시 기능명세] 행은 키보드로 선택할 수 있으며 내부 작업 버튼과 독립한다.
+ * 입력: 계약 행/모달 클래스와 화면 폭. 출력: 줄바꿈 가능한 행 배지, 모바일 한 열 폼, 검토 표 내부 스크롤.
+ * 처리/예외: 긴 제목·파일명은 줄바꿈한다. 서버 동작이나 판정 상태는 변경하지 않는다. */
+.contracts-row[role=button]{cursor:pointer}
+.contracts-row[role=button]:focus-visible{outline:3px solid #83b99a;outline-offset:-3px}
+.contracts-row-top{flex-wrap:wrap}
+.contract-row-action{margin-left:0;align-items:flex-start;margin-top:5px}
+.contract-row-action button{font-size:var(--font-body-small);min-height:32px;padding:7px 10px}
+.contract-row-action .statement-hint{text-align:left}
+.contracts-row .contracts-title{overflow-wrap:anywhere}
+.expense-modal{min-width:0}
+.expense-modal textarea{font:inherit;color:#304239;background:var(--color-white);border:1px solid #dce2dc;border-radius:7px;padding:10px 12px;width:100%;resize:vertical;min-width:0}
+.expense-modal textarea:focus-visible{outline:3px solid #83b99a;outline-offset:3px}
+.expense-fields .wide{grid-column:1 / -1}
+.expense-modal header h2{display:flex;align-items:center;gap:var(--space-small)}
+.expense-modal .statement-body{overflow-x:hidden}
+.expense-progress{display:grid;justify-items:center;gap:15px;padding:35px 0;text-align:center;color:#627452}
+.expense-progress h3{font-size:15px;line-height:1.6}
+.expense-progress p{font-size:var(--font-body);overflow-wrap:anywhere}
+.expense-progress progress{width:100%}
+.expense-result{display:grid;gap:16px;min-width:0}
+.expense-review{overflow:auto;max-width:100%;border:1px solid #e6ecde;border-radius:7px}
+.expense-review table{width:100%;min-width:480px;border-collapse:collapse;background:var(--color-white)}
+.expense-review th,.expense-review td{padding:11px;text-align:left;border-bottom:1px solid #edf1e7;font-size:var(--font-body-small);white-space:normal;overflow-wrap:anywhere}
+.expense-review tbody th{min-width:110px;font-weight:500}
+.expense-review .review-ok{color:#397353;font-weight:700;white-space:nowrap}
+.expense-review .review-fail{color:#b05b46;font-weight:700;white-space:nowrap}
+.expense-document{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-small);text-decoration:none}
+.expense-result>small{font-size:var(--font-body-small);color:#819574;line-height:1.6}
+@media(max-width:600px){
+.expense-modal{max-height:calc(100dvh - 20px)}
+.expense-fields{grid-template-columns:minmax(0,1fr)}
+.expense-modal .modal-actions{flex-wrap:wrap}
+.expense-modal .modal-actions>*{flex:1}
+.contracts-row-top{gap:6px}
+}
+.compare-badge{padding:0;border:0;background:none;cursor:pointer;font:inherit}
+.compare-badge:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:999px}
